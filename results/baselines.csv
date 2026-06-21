@@ -1,0 +1,7 @@
+model,dataset,task,metric_primary,value_primary,metric_secondary,value_secondary,n_train,n_test
+RandomForest+Morgan,BBBP,classification,roc_auc,0.6807,f1,0.6882,1580,198
+RandomForest+Morgan,BACE,classification,roc_auc,0.8599,f1,0.5763,1210,152
+RandomForest+Morgan,ESOL,regression,rmse,1.6583,mae,1.2636,893,113
+ChemBERTa-2-full-FT,BBBP,classification,roc_auc,0.6293,f1,0.6875,1580,198
+ChemBERTa-2-full-FT,BACE,classification,roc_auc,0.7650,f1,0.3689,1210,152
+ChemBERTa-2-full-FT,ESOL,regression,rmse,1.9609,mae,1.5297,893,113
