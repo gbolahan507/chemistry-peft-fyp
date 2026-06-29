@@ -1,0 +1,8 @@
+torch
+transformers>=4.46
+peft>=0.16
+accelerate
+bitsandbytes
+gradio
+spaces
+requests
