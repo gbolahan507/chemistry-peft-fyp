@@ -179,7 +179,7 @@ def fill_example(name: str) -> str:
 
 with gr.Blocks(title="Chemistry Molecule Predictor — FYP Demo") as demo:
     gr.Markdown(
-        "# Chemistry Molecule Predictor\n"
+        "# Chemistry Molecules Predictor\n"
         "MSc FYP: *Lightweight Domain Adaptation of Small Language Models for Chemistry "
         "— A Parameter-Efficient Fine-Tuning Approach Using LoRA and QLoRA*.\n\n"
         "Type a molecule **name** (e.g. *Aspirin*) or paste a **SMILES** string, pick a task, "
