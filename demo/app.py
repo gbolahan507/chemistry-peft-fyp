@@ -2,7 +2,7 @@
 Chemistry Molecule Predictor — Gradio demo for HF Spaces (ZeroGPU).
 
 Loads microsoft/Phi-4-mini-instruct (4-bit base for QLoRA, fp16 for LoRA)
-plus 6 adapters from Gbolahan507/phi4-{lora,qlora}-{bbbp,bace,esol}.
+plus 4 adapters from Gbolahan507/phi4-{lora,qlora}-{bbbp,bace}.
 
 Supervisor types a molecule name (e.g. "Aspirin") or SMILES, picks task
 and adapter, and gets a prediction.
@@ -26,22 +26,18 @@ HF_USER = "Gbolahan507"
 ADAPTER_REPOS = {
     ("LoRA",  "BBBP"): f"{HF_USER}/phi4-lora-bbbp",
     ("LoRA",  "BACE"): f"{HF_USER}/phi4-lora-bace",
-    ("LoRA",  "ESOL"): f"{HF_USER}/phi4-lora-esol",
     ("QLoRA", "BBBP"): f"{HF_USER}/phi4-qlora-bbbp",
     ("QLoRA", "BACE"): f"{HF_USER}/phi4-qlora-bace",
-    ("QLoRA", "ESOL"): f"{HF_USER}/phi4-qlora-esol",
 }
 
 TASK_DESCRIPTIONS = {
     "BBBP": "Blood-brain barrier penetration (Yes/No)",
     "BACE": "BACE-1 enzyme inhibition (Yes/No) — Alzheimer's drug target",
-    "ESOL": "Aqueous solubility (log mol/L) — water solubility",
 }
 
 PROMPT_TEMPLATES = {
     "BBBP": "You are a chemistry assistant. Given the SMILES, does this molecule cross the blood-brain barrier? Answer yes or no.\nSMILES: {smiles}\nAnswer:",
     "BACE": "You are a chemistry assistant. Given the SMILES, does this molecule inhibit the BACE-1 enzyme? Answer yes or no.\nSMILES: {smiles}\nAnswer:",
-    "ESOL": "You are a chemistry assistant. Given the SMILES, predict the aqueous solubility (log mol/L).\nSMILES: {smiles}\nAnswer:",
 }
 
 BNB_CONFIG = BitsAndBytesConfig(
@@ -147,21 +143,15 @@ def predict(user_input: str, task: str, variant: str):
     with torch.no_grad():
         logits = model(**enc).logits[0, -1]
 
-    if task in ("BBBP", "BACE"):
-        yes_id = tokenizer.encode(" yes", add_special_tokens=False)[0]
-        no_id  = tokenizer.encode(" no",  add_special_tokens=False)[0]
-        yes_score = float(logits[yes_id])
-        no_score  = float(logits[no_id])
-        probs = torch.softmax(torch.tensor([yes_score, no_score]), dim=0)
-        yes_prob = float(probs[0])
-        verdict = "YES" if yes_prob > 0.5 else "NO"
-        confidence = max(yes_prob, 1 - yes_prob)
-        result_line = f"**Prediction:** {verdict}  \n**Confidence:** {confidence:.3f}"
-    else:
-        with torch.no_grad():
-            out = model.generate(**enc, max_new_tokens=12, do_sample=False)
-        generated = tokenizer.decode(out[0][enc.input_ids.shape[1]:], skip_special_tokens=True)
-        result_line = f"**Predicted log-solubility:** {generated.strip()}"
+    yes_id = tokenizer.encode(" yes", add_special_tokens=False)[0]
+    no_id  = tokenizer.encode(" no",  add_special_tokens=False)[0]
+    yes_score = float(logits[yes_id])
+    no_score  = float(logits[no_id])
+    probs = torch.softmax(torch.tensor([yes_score, no_score]), dim=0)
+    yes_prob = float(probs[0])
+    verdict = "YES" if yes_prob > 0.5 else "NO"
+    confidence = max(yes_prob, 1 - yes_prob)
+    result_line = f"**Prediction:** {verdict}  \n**Confidence:** {confidence:.3f}"
 
     return (
         f"### Result\n\n"
@@ -200,10 +190,10 @@ with gr.Blocks(title="Chemistry Mol Predictor — FYP Demo") as demo:
                     )
 
             task = gr.Dropdown(
-                choices=["BBBP", "BACE", "ESOL"],
+                choices=["BBBP", "BACE"],
                 value="BBBP",
                 label="Task",
-                info="BBBP: brain barrier · BACE: enzyme inhibition · ESOL: water solubility",
+                info="BBBP: brain barrier · BACE: enzyme inhibition",
             )
             variant = gr.Radio(
                 choices=["LoRA", "QLoRA"],
@@ -221,7 +211,7 @@ with gr.Blocks(title="Chemistry Mol Predictor — FYP Demo") as demo:
     gr.Markdown(
         "---\n"
         "**Base model:** [microsoft/Phi-4-mini-instruct](https://huggingface.co/microsoft/Phi-4-mini-instruct)  \n"
-        "**Adapters:** trained on MoleculeNet BBBP, BACE, ESOL with scaffold splits  \n"
+        "**Adapters:** trained on MoleculeNet BBBP and BACE with scaffold splits  \n"
         "**Code:** [github.com/gbolahan507/chemistry-peft-fyp](https://github.com/gbolahan507/chemistry-peft-fyp)"
     )
 
