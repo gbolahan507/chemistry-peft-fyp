@@ -38,11 +38,31 @@ PROMPT_TEMPLATES = {
 }
 
 EXAMPLES = {
-    "Aspirin": "CC(=O)Oc1ccccc1C(=O)O",
+    "Aspirin":     "CC(=O)Oc1ccccc1C(=O)O",
     "Paracetamol": "CC(=O)Nc1ccc(O)cc1",
-    "Caffeine": "CN1C=NC2=C1C(=O)N(C(=O)N2C)C",
-    "Ibuprofen": "CC(C)Cc1ccc(C(C)C(=O)O)cc1",
+    "Caffeine":    "CN1C=NC2=C1C(=O)N(C(=O)N2C)C",
+    "Ibuprofen":   "CC(C)Cc1ccc(C(C)C(=O)O)cc1",
 }
+
+# Extended offline cache — safety net if PubChem is unreachable.
+# Keys are compared case-insensitively (see name_to_smiles).
+NAME_CACHE = {
+    **EXAMPLES,
+    "Ethanol":     "CCO",
+    "Methanol":    "CO",
+    "Benzene":     "c1ccccc1",
+    "Glucose":     "OCC1OC(O)C(O)C(O)C1O",
+    "Water":       "O",
+    "Acetone":     "CC(=O)C",
+    "Toluene":     "Cc1ccccc1",
+    "Phenol":      "Oc1ccccc1",
+    "Naproxen":    "CC(C(=O)O)c1ccc2cc(OC)ccc2c1",
+    "Nicotine":    "CN1CCCC1c1cccnc1",
+    "Morphine":    "CN1CCC23c4c5ccc(O)c4OC2C(O)C=CC3C1C5",
+    "Diazepam":    "CN1C(=O)CN=C(c2ccccc2)c2cc(Cl)ccc21",
+}
+# Build a lowercase index for case-insensitive lookup
+_NAME_CACHE_LOWER = {k.lower(): v for k, v in NAME_CACHE.items()}
 
 
 def looks_like_smiles(text: str) -> bool:
@@ -59,9 +79,11 @@ def name_to_smiles(name: str) -> str | None:
     name = name.strip()
     if not name:
         return None
-    cached = EXAMPLES.get(name) or EXAMPLES.get(name.title())
+    # 1. Case-insensitive local cache — bulletproof against PubChem outages
+    cached = _NAME_CACHE_LOWER.get(name.lower())
     if cached:
         return cached
+    # 2. Fall back to PubChem for uncached names
     try:
         url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{name}/property/CanonicalSMILES/JSON"
         r = requests.get(url, timeout=10)
