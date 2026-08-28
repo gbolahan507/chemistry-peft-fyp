@@ -1,33 +1,30 @@
 """
 Chemistry Molecule Predictor — Gradio demo for HF Spaces (ZeroGPU).
 
-Loads microsoft/Phi-4-mini-instruct (4-bit base for QLoRA, fp16 for LoRA)
-plus 4 adapters from Gbolahan507/phi4-{lora,qlora}-{bbbp,bace}.
+Loads microsoft/Phi-4-mini-instruct (fp16) plus 2 LoRA adapters from
+Gbolahan507/phi4-lora-{bbbp,bace}.
 
-Supervisor types a molecule name (e.g. "Aspirin") or SMILES, picks task
-and adapter, and gets a prediction.
+User types a molecule name (e.g. "Aspirin") or SMILES, picks a task,
+and gets a Yes/No prediction with confidence.
 
 FYP: Lightweight Domain Adaptation of Small Language Models for Chemistry.
 """
 
-import os
 import gradio as gr
 import spaces
 import torch
 import requests
 from functools import lru_cache
 
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 
 BASE_MODEL = "microsoft/Phi-4-mini-instruct"
 HF_USER = "Gbolahan507"
 
 ADAPTER_REPOS = {
-    ("LoRA",  "BBBP"): f"{HF_USER}/phi4-lora-bbbp",
-    ("LoRA",  "BACE"): f"{HF_USER}/phi4-lora-bace",
-    ("QLoRA", "BBBP"): f"{HF_USER}/phi4-qlora-bbbp",
-    ("QLoRA", "BACE"): f"{HF_USER}/phi4-qlora-bace",
+    "BBBP": f"{HF_USER}/phi4-lora-bbbp",
+    "BACE": f"{HF_USER}/phi4-lora-bace",
 }
 
 TASK_DESCRIPTIONS = {
@@ -39,13 +36,6 @@ PROMPT_TEMPLATES = {
     "BBBP": "You are a chemistry assistant. Given the SMILES, does this molecule cross the blood-brain barrier? Answer yes or no.\nSMILES: {smiles}\nAnswer:",
     "BACE": "You are a chemistry assistant. Given the SMILES, does this molecule inhibit the BACE-1 enzyme? Answer yes or no.\nSMILES: {smiles}\nAnswer:",
 }
-
-BNB_CONFIG = BitsAndBytesConfig(
-    load_in_4bit=True,
-    bnb_4bit_quant_type="nf4",
-    bnb_4bit_use_double_quant=True,
-    bnb_4bit_compute_dtype=torch.float16,
-)
 
 EXAMPLES = {
     "Aspirin": "CC(=O)Oc1ccccc1C(=O)O",
@@ -90,8 +80,7 @@ def resolve_input(user_input: str) -> tuple[str, str]:
 
 
 _tokenizer = None
-_base_lora = None
-_base_qlora = None
+_base_model = None
 
 
 def get_tokenizer():
@@ -103,39 +92,32 @@ def get_tokenizer():
     return _tokenizer
 
 
-def get_base(variant: str):
-    global _base_lora, _base_qlora
-    if variant == "LoRA":
-        if _base_lora is None:
-            _base_lora = AutoModelForCausalLM.from_pretrained(
-                BASE_MODEL, torch_dtype=torch.float16, trust_remote_code=True
-            ).to("cuda")
-        return _base_lora
-    else:
-        if _base_qlora is None:
-            _base_qlora = AutoModelForCausalLM.from_pretrained(
-                BASE_MODEL, quantization_config=BNB_CONFIG, trust_remote_code=True
-            )
-        return _base_qlora
+def get_base():
+    global _base_model
+    if _base_model is None:
+        _base_model = AutoModelForCausalLM.from_pretrained(
+            BASE_MODEL, torch_dtype=torch.float16, trust_remote_code=True
+        ).to("cuda")
+    return _base_model
 
 
-@lru_cache(maxsize=12)
-def get_adapter(variant: str, task: str):
-    repo_id = ADAPTER_REPOS[(variant, task)]
-    base = get_base(variant)
+@lru_cache(maxsize=4)
+def get_adapter(task: str):
+    repo_id = ADAPTER_REPOS[task]
+    base = get_base()
     model = PeftModel.from_pretrained(base, repo_id)
     model.eval()
     return model
 
 
 @spaces.GPU(duration=120)
-def predict(user_input: str, task: str, variant: str):
+def predict(user_input: str, task: str):
     if not user_input or not user_input.strip():
         raise gr.Error("Please enter a molecule name or SMILES.")
 
     name, smiles = resolve_input(user_input)
     tokenizer = get_tokenizer()
-    model = get_adapter(variant, task)
+    model = get_adapter(task)
 
     prompt = PROMPT_TEMPLATES[task].format(smiles=smiles)
     enc = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=256).to("cuda")
@@ -158,20 +140,16 @@ def predict(user_input: str, task: str, variant: str):
         f"**Name:** {name}  \n"
         f"**SMILES:** `{smiles}`  \n"
         f"**Task:** {task} — {TASK_DESCRIPTIONS[task]}  \n"
-        f"**Adapter:** Phi-4-mini-instruct + {variant}  \n\n"
+        f"**Adapter:** Phi-4-mini-instruct + LoRA  \n\n"
         f"{result_line}"
     )
-
-
-def fill_example(name: str) -> str:
-    return name
 
 
 with gr.Blocks(title="Chemistry Mol Predictor — FYP Demo") as demo:
     gr.Markdown(
         "# Chemistry Molecules Predictor\n"
         "MSc FYP: *Lightweight Domain Adaptation of Small Language Models for Chemistry "
-        "— A Parameter-Efficient Fine-Tuning Approach Using LoRA and QLoRA*.\n\n"
+        "— A Parameter-Efficient Fine-Tuning Approach Using LoRA*.\n\n"
         "Type a molecule **name** (e.g. *Aspirin*) or paste a **SMILES** string, pick a task, "
         "and the fine-tuned Phi-4 model predicts the property."
     )
@@ -195,18 +173,12 @@ with gr.Blocks(title="Chemistry Mol Predictor — FYP Demo") as demo:
                 label="Task",
                 info="BBBP: brain barrier · BACE: enzyme inhibition",
             )
-            variant = gr.Radio(
-                choices=["LoRA", "QLoRA"],
-                value="LoRA",
-                label="Adapter type",
-                info="LoRA = fp16 base · QLoRA = 4-bit base (cheaper memory)",
-            )
             btn = gr.Button("Predict", variant="primary")
 
         with gr.Column(scale=3):
             out = gr.Markdown(label="Result")
 
-    btn.click(predict, inputs=[inp, task, variant], outputs=out)
+    btn.click(predict, inputs=[inp, task], outputs=out)
 
     gr.Markdown(
         "---\n"
