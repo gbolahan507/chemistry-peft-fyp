@@ -59,6 +59,9 @@ def name_to_smiles(name: str) -> str | None:
     name = name.strip()
     if not name:
         return None
+    cached = EXAMPLES.get(name) or EXAMPLES.get(name.title())
+    if cached:
+        return cached
     try:
         url = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{name}/property/CanonicalSMILES/JSON"
         r = requests.get(url, timeout=10)
