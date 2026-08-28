@@ -44,6 +44,15 @@ EXAMPLES = {
     "Ibuprofen":   "CC(C)Cc1ccc(C(C)C(=O)O)cc1",
 }
 
+# Raw SMILES examples — buttons show the SMILES string itself,
+# so users see the two input formats the app accepts (name OR SMILES).
+SMILES_EXAMPLES = [
+    "CCO",                                     # ethanol
+    "c1ccccc1",                                # benzene
+    "CC(=O)C",                                 # acetone
+    "Oc1ccccc1",                               # phenol
+]
+
 # Extended offline cache — safety net if PubChem is unreachable.
 # Keys are compared case-insensitively (see name_to_smiles).
 NAME_CACHE = {
@@ -190,6 +199,11 @@ with gr.Blocks(title="Chemistry Mol Predictor — FYP Demo") as demo:
                 for ex_name in EXAMPLES:
                     gr.Button(ex_name, size="sm").click(
                         lambda n=ex_name: n, outputs=inp
+                    )
+            with gr.Row():
+                for ex_smi in SMILES_EXAMPLES:
+                    gr.Button(ex_smi, size="sm").click(
+                        lambda s=ex_smi: s, outputs=inp
                     )
 
             task = gr.Dropdown(
