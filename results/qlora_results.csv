@@ -1,3 +1,0 @@
-model,dataset,task,quantisation,optimizer,lora_rank,lora_alpha,lora_lr,epochs,trainable_params,total_params,trainable_pct,peak_mem_mb,train_time_s,metric_primary,value_primary,metric_secondary,value_secondary
-microsoft/Phi-4-mini-instruct,BBBP,classification,nf4_double,paged_adamw_8bit,8,16,0.0001,3,3670016,2229079040,0.1646,5056.3,1986.8,roc_auc,0.6766,f1,0.7115
-microsoft/Phi-4-mini-instruct,BACE,classification,nf4_double,paged_adamw_8bit,8,16,0.0001,3,3670016,2229079040,0.1646,6382.6,1620.4,roc_auc,0.8292,f1,0.5546
